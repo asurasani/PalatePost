@@ -38,6 +38,12 @@ const userSchema = new Schema(
         ref: "User",
       },
     ],
+    savedRecipes: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "RecipePost",
+      },
+    ],
     createdAt: {
       type: Date,
       default: Date.now,
