@@ -11,42 +11,178 @@ export const getAllUsers = async (req, res) => {
 
 export const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-    res.status(201).json(user);
+    const user = await User.findById(req.params.id).select(
+      "-password -refreshToken"
+    ); // Exclude sensitive fields
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: user,
+    });
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    return res.status(500).json({
+      success: false,
+      message: "Error retrieving user",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 };
 
 export const createUser = async (req, res) => {
   try {
-    if (!req.body.firstName || !req.body.lastName || !req.body.email) {
-      return res
-        .status(400)
-        .json({ message: "Please fill all required fields" });
+    const requiredFields = ["firstName", "lastName", "email", "password"];
+    const missingFields = requiredFields.filter((field) => !req.body[field]);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+        missingFields,
+      });
     }
-    const user = new User(req.body);
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(req.body.email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email format",
+      });
+    }
+
+    // Check if email already exists
+    const existingUser = await User.findOne({ email: req.body.email });
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: "Email already registered",
+      });
+    }
+
+    // Create new user
+    const user = new User({
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+      email: req.body.email.toLowerCase(),
+      password: req.body.password,
+      role: req.body.role || "user", // Default role
+      isActive: true,
+    });
+
     const savedUser = await user.save();
-    res.status(201).json(savedUser);
+
+    // Remove sensitive data from response
+    const userResponse = savedUser.toObject();
+    delete userResponse.password;
+    delete userResponse.refreshToken;
+
+    return res.status(201).json({
+      success: true,
+      message: "User created successfully",
+      data: userResponse,
+    });
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    return res.status(500).json({
+      success: false,
+      message: "Error creating user",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 };
 
-export const updatedUser = async (req, res) => {
+export const updateUser = async (req, res) => {
   try {
-    if (!req.body.firstName || !req.body.lastName || !req.body.email) {
-      return res
-        .status(400)
-        .json({ message: "Please fill all required fields" });
+    // Check for empty request body
+    if (Object.keys(req.body).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide at least one field to update",
+      });
     }
+
+    // Define allowed fields for updating
+    const allowedUpdates = ["name", "email", "password", "profile"];
+    const updates = Object.keys(req.body);
+
+    // Validate update fields
+    const isValidOperation = updates.every((update) =>
+      allowedUpdates.includes(update)
+    );
+    if (!isValidOperation) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid updates. Allowed fields: ${allowedUpdates.join(
+          ", "
+        )}`,
+      });
+    }
+
+    // Find user and verify existence
     const user = await User.findById(req.params.id);
-    user.firstName = req.body.firstName;
-    user.lastName = req.body.lastName;
-    user.email = req.body.email;
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // If updating email, check if new email already exists
+    if (req.body.email && req.body.email !== user.email) {
+      const emailExists = await User.findOne({ email: req.body.email });
+      if (emailExists) {
+        return res.status(400).json({
+          success: false,
+          message: "Email already in use",
+        });
+      }
+    }
+
+    // Update user fields
+    updates.forEach((update) => {
+      user[update] = req.body[update];
+    });
+
+    // If password is being updated, it will be hashed by the pre-save middleware
     const updatedUser = await user.save();
-    res.status(201).json(updatedUser);
+
+    // Remove sensitive fields from response
+    const userResponse = updatedUser.toObject();
+    delete userResponse.password;
+
+    return res.status(200).json({
+      success: true,
+      message: "User updated successfully",
+      data: userResponse,
+    });
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    // Handle specific error types
+    if (err.name === "ValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: "Validation error",
+        errors: Object.values(err.errors).map((e) => e.message),
+      });
+    }
+
+    if (err.name === "CastError") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+      });
+    }
+
+    // Generic error handler
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 };
