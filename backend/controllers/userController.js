@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import RecipePost from "../models/RecipePost.js";
 
 export const getAllUsers = async (req, res) => {
   try {
@@ -204,6 +205,50 @@ export const deleteUser = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Error deleting user",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
+  }
+};
+
+export const getFollowedUsersPosts = async (req, res) => {
+  try {
+    //Fetch the user by id
+    //access the users following array for user ids
+    //fetch all posts by those ids
+    //sort those posts by newest posts
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const followingUsers = user.following;
+    if (followingUsers.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "User follows no one",
+        data: [],
+      });
+    }
+
+    const followedUserPosts = (
+      await RecipePost.find({ _id: { $in: followingUsers } })
+    )
+      .populate("user", "firstName lastName")
+      .sort({ createdAt: -1 })
+      .limit(req.query.limit || 10)
+      .skip(req.query.skip || 0);
+
+    return res.status(200).json({
+      success: true,
+      data: followedUserPosts,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: "Error getting followed users posts",
       error: process.env.NODE_ENV === "development" ? err.message : undefined,
     });
   }
