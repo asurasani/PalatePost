@@ -10,6 +10,7 @@ import {
 import mongoose from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import User from "../models/User";
+import RecipePost from "../models/RecipePost";
 import {
   getAllUsers,
   getUserById,
@@ -19,6 +20,8 @@ import {
   getFollowedUsersPosts,
 } from "../controllers/userController";
 import { createMockUser } from "./mocks/mockUserFactory";
+import { createMockRecipePost } from "./mocks/mockRecipePostFactory";
+
 let mongoServer;
 
 beforeAll(async () => {
@@ -35,6 +38,13 @@ afterAll(async () => {
 beforeEach(async () => {
   await User.deleteMany({});
 });
+
+vi.mock("../models/RecipePost", () => ({
+  default: {
+    find: vi.fn(),
+    create: vi.fn(),
+  },
+}));
 
 describe("User Controller Tests", () => {
   it("should get all users", async () => {
@@ -234,6 +244,82 @@ describe("User Controller Tests", () => {
     expect(res.json.mock.calls[0][0]).toMatchObject({
       success: false,
       message: "User not found",
+    });
+  });
+});
+
+describe("Followed Users Tests", () => {
+  it("should return empty data if no followed users", async () => {
+    //Arrange
+    const user = await User.create(createMockUser({ firstName: "John" }));
+    const req = { params: { id: user._id.toString() } };
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+
+    //Act
+    await getFollowedUsersPosts(req, res);
+
+    //Assert
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json.mock.calls[0][0]).toMatchObject({
+      success: true,
+      message: "User follows no one",
+    });
+  });
+
+  it("should return followed users posts with default pagination", async () => {
+    const mockRequest = {
+      params: {
+        id: new mongoose.Types.ObjectId(),
+      },
+      query: {},
+    };
+
+    const mockResponse = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+    // Create mock followed users
+    const followedUser1 = createMockUser();
+    const followedUser2 = createMockUser();
+
+    // Create mock user with following
+    const mockUser = createMockUser({
+      following: [followedUser1._id, followedUser2._id],
+    });
+
+    // Create mock posts
+    const mockPosts = [
+      createMockRecipePost({ user: followedUser1._id }),
+      createMockRecipePost({ user: followedUser2._id }),
+    ];
+
+    // Setup mocks
+    User.findById = vi.fn().mockResolvedValue(mockUser);
+    RecipePost.find = vi.fn().mockReturnThis();
+    RecipePost.populate = vi.fn().mockReturnThis();
+    RecipePost.sort = vi.fn().mockReturnThis();
+    RecipePost.limit = vi.fn().mockReturnThis();
+    RecipePost.skip = vi.fn().mockResolvedValue(mockPosts);
+
+    await getFollowedUsersPosts(mockRequest, mockResponse);
+
+    expect(RecipePost.find).toHaveBeenCalledWith({
+      user: { $in: mockUser.following },
+    });
+    expect(RecipePost.populate).toHaveBeenCalledWith(
+      "user",
+      "firstName lastName"
+    );
+    expect(RecipePost.sort).toHaveBeenCalledWith({ createdAt: -1 });
+    expect(RecipePost.limit).toHaveBeenCalledWith(10);
+    expect(RecipePost.skip).toHaveBeenCalledWith(0);
+    expect(mockResponse.status).toHaveBeenCalledWith(200);
+    expect(mockResponse.json).toHaveBeenCalledWith({
+      success: true,
+      data: mockPosts,
     });
   });
 });

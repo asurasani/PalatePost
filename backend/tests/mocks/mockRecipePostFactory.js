@@ -1,6 +1,8 @@
+import mongoose from "mongoose";
+
 export const createMockRecipePost = (overrides = {}) => ({
-  _id: "64aefb" + Math.random().toString(16).slice(2, 14),
-  user: "64aefb123456789abcdef123",
+  _id: new mongoose.Types.ObjectId(),
+  user: new mongoose.Types.ObjectId(),
   title: "Spaghetti Bolognese",
   likes: 3,
   recipe: "Cook pasta and sauce.",
