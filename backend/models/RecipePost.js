@@ -3,7 +3,8 @@ import { Schema } from "mongoose";
 
 const recipePostSchema = new Schema({
   user: {
-    type: String,
+    type: Schema.Types.ObjectId,
+    ref: "User",
     required: true,
   },
   title: {
@@ -92,4 +93,5 @@ const recipePostSchema = new Schema({
   },
 });
 
-export default model("RecipePost", recipePostSchema);
+const RecipePost = mongoose.model("RecipePost", recipePostSchema);
+export default RecipePost;

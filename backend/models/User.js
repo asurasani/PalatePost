@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { Schema } from "mongoose";
+import bcrypt from "bcrypt";
 
 const userSchema = new Schema(
   {
@@ -17,6 +18,17 @@ const userSchema = new Schema(
       unique: true,
       lowercase: true,
       match: [/.+\@.+\..+/, "Please fill a valid email address"],
+    },
+    password: {
+      type: String,
+      required: true,
+      select: false,
+    },
+    profileType: {
+      type: String,
+      enum: ["Public", "Private"],
+      default: "Public",
+      required: true,
     },
     bio: {
       type: String,
@@ -38,7 +50,8 @@ const userSchema = new Schema(
         ref: "User",
       },
     ],
-    savedRecipes: [
+
+    recipePosts: [
       {
         type: Schema.Types.ObjectId,
         ref: "RecipePost",
