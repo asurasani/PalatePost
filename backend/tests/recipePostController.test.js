@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import mongoose from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import RecipePost from "../models/recipePost";
-import User from "../models/user";
+import RecipePost from "../models/RecipePost";
+import User from "../models/User";
 import {
   getAllPosts,
   createRecipePost,
