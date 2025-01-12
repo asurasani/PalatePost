@@ -9,8 +9,8 @@ import {
 } from "vitest";
 import mongoose from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import User from "../models/User";
-import RecipePost from "../models/RecipePost";
+import User from "../models/User.js";
+import RecipePost from "../models/RecipePost.js";
 import {
   getAllUsers,
   getUserById,

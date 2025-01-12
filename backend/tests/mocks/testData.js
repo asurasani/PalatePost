@@ -57,3 +57,18 @@ export const mockRecipePosts = [
     ],
   },
 ];
+
+export const mockComments = [
+  {
+    _id: "6780a11269c8e7f9fb55ca8e",
+    user: "64aefb123456789abcdef123",
+    post: "6780a11269c8e7f9fb55ca8c",
+    text: "This is a comment",
+  },
+  {
+    _id: "6780a11269c8e7f9fb55ca8f",
+    user: "64aefb123456789abcdef124",
+    post: "6780a11269c8e7f9fb55ca8c",
+    text: "This is another comment",
+  },
+];
