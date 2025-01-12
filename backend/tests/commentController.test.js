@@ -37,6 +37,7 @@ beforeEach(async () => {
 describe("Comment Controller Tests", () => {
   // Add your comment controller tests here
   it("Should create a comment", async () => {
+    //Arrange
     const user = await User.create(createMockUser());
     const post = await RecipePost.create(
       createMockRecipePost({ user: user._id })
