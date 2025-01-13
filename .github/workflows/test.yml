@@ -23,6 +23,9 @@ jobs:
 
       - name: Run Vitest
         working-directory: ./backend
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_EXPIRATION: 7d
         run: npm test # or your specific test script
 
 
