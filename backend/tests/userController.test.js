@@ -18,9 +18,12 @@ import {
   updateUser,
   deleteUser,
   getFollowedUsersPosts,
+  loginUser,
+  logoutUser,
 } from "../controllers/userController";
 import { createMockUser } from "./mocks/mockUserFactory";
 import { createMockRecipePost } from "./mocks/mockRecipePostFactory";
+import { addToBlacklist } from "../utils/blacklist.js";
 
 let mongoServer;
 
@@ -44,6 +47,10 @@ vi.mock("../models/RecipePost", () => ({
     find: vi.fn(),
     create: vi.fn(),
   },
+}));
+
+vi.mock("../utils/blacklist.js", () => ({
+  addToBlacklist: vi.fn(),
 }));
 
 describe("User Controller Tests", () => {
@@ -120,6 +127,12 @@ describe("User Controller Tests", () => {
     expect(res.json.mock.calls[0][0]).toMatchObject({
       success: true,
       message: "User created successfully",
+    });
+
+    // Ensure token exists in the response
+    expect(res.json.mock.calls[0][0].data.token).toBeDefined();
+    expect(res.json.mock.calls[0][0].data.user).toMatchObject({
+      email: "john@example.com",
     });
   });
   it("should return a 400 if required fields are missing", async () => {
@@ -320,6 +333,89 @@ describe("Followed Users Tests", () => {
     expect(mockResponse.json).toHaveBeenCalledWith({
       success: true,
       data: mockPosts,
+    });
+  });
+});
+
+describe("Authentication User Tests", () => {
+  it("should return success on successful login", async () => {
+    //Arrange
+    const password = "correctpassword";
+
+    const user = await User.create({
+      firstName: "John",
+      lastName: "Doe",
+      email: "test@example.com",
+      password: "correctpassword",
+    });
+
+    const req = {
+      body: { email: "test@example.com", password: "correctpassword" },
+    };
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+
+    //Act
+    await loginUser(req, res);
+
+    //Assert
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json.mock.calls[0][0]).toMatchObject({
+      message: "Login successful",
+      user: {
+        id: user._id,
+        email: "test@example.com",
+        fullName: `${user.firstName} ${user.lastName}`,
+      },
+    });
+
+    // Ensure the token exists in the response
+    expect(res.json.mock.calls[0][0].token).toBeDefined();
+  });
+
+  it("should successfully logout a user and add token to blacklist", async () => {
+    // Arrange
+    const mockToken = "mock-jwt-token";
+    const req = {
+      headers: {
+        authorization: `Bearer ${mockToken}`,
+      },
+    };
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+
+    // Act
+    await logoutUser(req, res);
+
+    // Assert
+    expect(addToBlacklist).toHaveBeenCalledWith(mockToken);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ message: "Logout successful" });
+  });
+
+  it("should return 400 if no token is provided", async () => {
+    // Arrange
+    const req = {
+      headers: {
+        authorization: null,
+      },
+    };
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+
+    // Act
+    await logoutUser(req, res);
+
+    // Assert
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "Token is required for logout",
     });
   });
 });

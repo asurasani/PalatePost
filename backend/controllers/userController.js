@@ -1,5 +1,8 @@
 import User from "../models/User.js";
 import RecipePost from "../models/RecipePost.js";
+import bcrypt from "bcrypt";
+import { addToBlacklist } from "../utils/blacklist.js";
+import { generateToken } from "../utils/jwt.js";
 
 export const getAllUsers = async (req, res) => {
   try {
@@ -84,10 +87,13 @@ export const createUser = async (req, res) => {
     delete userResponse.password;
     delete userResponse.refreshToken;
 
+    // Generate a JWT token
+    const token = generateToken(savedUser._id);
+
     return res.status(201).json({
       success: true,
       message: "User created successfully",
-      data: userResponse,
+      data: { user: userResponse, token },
     });
   } catch (err) {
     return res.status(500).json({
@@ -252,4 +258,48 @@ export const getFollowedUsersPosts = async (req, res) => {
       error: process.env.NODE_ENV === "development" ? err.message : undefined,
     });
   }
+};
+
+export const loginUser = async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    // Check if user exists
+    const user = await User.findOne({ email }).select("+password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Compare passwords
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    // Generate JWT token
+    const token = generateToken(user._id);
+
+    return res.status(200).json({
+      message: "Login successful",
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+};
+
+export const logoutUser = async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) {
+    return res.status(400).json({ message: "Token is required for logout" });
+  }
+
+  addToBlacklist(token);
+
+  return res.status(200).json({ message: "Logout successful" });
 };
