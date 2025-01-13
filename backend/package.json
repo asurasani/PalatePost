@@ -5,6 +5,7 @@
     "@babel/preset-env": "^7.24.0",
     "@testing-library/vue": "^8.1.0",
     "@types/jest": "^29.5.14",
+    "@types/jsonwebtoken": "^9.0.7",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vitest/coverage-v8": "^2.1.8",
     "babel-jest": "^29.7.0",
@@ -19,9 +20,11 @@
   },
   "scripts": {
     "test": "vitest",
+    "test:debug": "vitest --inspect-brk",
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "dotenv": "^16.4.7",
     "exlint": "^0.1.6",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.3"
