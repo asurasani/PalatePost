@@ -2,7 +2,7 @@ import express, { json } from "express";
 import { connect } from "mongoose";
 import { config } from "dotenv";
 import cors from "cors";
-import postRoutes from "./routes/posts.js";
+import postRoutes from "./routes/recipePostRoutes.js";
 
 config();
 
@@ -13,10 +13,7 @@ app.use(cors());
 app.use(json());
 
 // MongoDB Connection
-connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
+connect(process.env.MONGO_URI)
   .then(() => console.log("Connected to MongoDB Atlas"))
   .catch((err) => console.error(err));
 
