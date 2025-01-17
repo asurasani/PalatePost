@@ -8,71 +8,15 @@ import RecipePost from "../models/RecipePost.js";
 
 const router = express.Router();
 
-// Middleware for validating request body
-const validatePostBody = (req, res, next) => {
-  const { title, user } = req.body;
-  if (!title || !user) {
-    return res.status(400).json({ message: "Title and user are required." });
-  }
-  next();
-};
-
 // Create a new post
 router.post("/", async (req, res) => {
   try {
-    const {
-      user,
-      title,
-      recipe,
-      imageUrl,
-      likes,
-      rating,
-      comments,
-      ingredients,
-      steps,
-      prepTime,
-      cookTime,
-      totalTime,
-      servings,
-      difficulty,
-      mealType,
-      views,
-      isPublished,
-      lastEditedAt,
-    } = req.body;
+    const data = req.body;
+    
+    // Ensure `data` contains all the required fields
+    console.log("Request body:", data);
 
-    // Optional: Add inline validation if needed
-    if (!user || !title || !recipe || !prepTime || !cookTime || !totalTime) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Required fields: user, title, recipe, prepTime, cookTime, totalTime.",
-      });
-    }
-
-    // Create and save the recipe post
-    const post = new RecipePost({
-      user,
-      title,
-      recipe,
-      imageUrl,
-      likes,
-      rating,
-      comments,
-      ingredients,
-      steps,
-      prepTime,
-      cookTime,
-      totalTime,
-      servings,
-      difficulty,
-      mealType,
-      views,
-      isPublished,
-      lastEditedAt,
-    });
-
-    const savedPost = await post.save();
+    const savedPost = await createRecipePost(data);
 
     res.status(201).json({
       success: true,

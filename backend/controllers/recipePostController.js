@@ -45,11 +45,11 @@ export const getAllPosts = async (req, res) => {
 
 /**
  * Create a new recipe post
- * @param {Object} req The request object
- * @param {Object} res The response object
- * @returns {Object} An object with a success boolean, message, and the created post
+ * @param {Object} data The recipe post data
+ * @returns {Object} The saved recipe post
+ * @throws {Error} If there is an error saving the recipe post
  */
-export const createRecipePost = async (req, res) => {
+export const createRecipePost = async (data) => {
   try {
     const {
       user,
@@ -64,14 +64,13 @@ export const createRecipePost = async (req, res) => {
       servings,
       difficulty,
       mealType,
-    } = req.body;
+    } = data;
 
     // Validate required fields
     if (!user || !title || !recipe || !prepTime || !cookTime || !totalTime) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields",
-      });
+      throw new Error(
+        "Missing required fields: user, title, recipe, prepTime, cookTime, totalTime"
+      );
     }
 
     // Create the recipe post
@@ -91,19 +90,9 @@ export const createRecipePost = async (req, res) => {
     });
 
     // Save to the database
-    const savedPost = await newRecipePost.save();
-
-    return res.status(201).json({
-      success: true,
-      message: "Recipe post created successfully",
-      data: savedPost,
-    });
+    return await newRecipePost.save();
   } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: "Error creating recipe post",
-      error: process.env.NODE_ENV === "development" ? err.message : undefined,
-    });
+    throw new Error(`Error creating recipe post: ${err.message}`);
   }
 };
 

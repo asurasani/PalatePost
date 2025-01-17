@@ -1,10 +1,9 @@
+import { config } from "dotenv";
+config({ path: "./backend/.env" });
 import express, { json } from "express";
 import { connect } from "mongoose";
-import { config } from "dotenv";
 import cors from "cors";
 import postRoutes from "./routes/recipePostRoutes.js";
-
-config();
 
 const app = express();
 
