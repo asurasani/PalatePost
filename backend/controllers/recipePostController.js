@@ -2,18 +2,17 @@ import RecipePost from "../models/RecipePost.js";
 import User from "../models/User.js";
 
 /**
- * Get all public posts and posts from followed users
- * @param {Object} req The request object
- * @param {Object} res The response object
- * @returns {Object} An object with a success boolean and an array of posts
+ * Get all posts for a user, including public posts and posts from followed users.
+ * @param {String} userId The ID of the user making the request.
+ * @returns {Array} An array of recipe posts.
+ * @throws {Error} If there is an error fetching posts.
  */
-export const getAllPosts = async (req, res) => {
+export const getAllPosts = async (userId) => {
   try {
-    // Get the logged-in user
-    const userId = req.user.id;
+    // Get the user making the request
     const user = await User.findById(userId).exec();
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      throw new Error("User not found");
     }
 
     // Get public users
@@ -21,7 +20,7 @@ export const getAllPosts = async (req, res) => {
       .select("_id")
       .exec();
 
-    // Get the IDs of users to fetch posts from (followed users and public users)
+    // Get the IDs of users to fetch posts from
     const userIdsToFetch = [
       ...user.following,
       ...publicUsers.map((u) => u._id),
@@ -29,25 +28,21 @@ export const getAllPosts = async (req, res) => {
 
     // Fetch posts from the selected users
     const posts = await RecipePost.find({ user: { $in: userIdsToFetch } })
-      .populate("user", "firstName lastName profileType") // Populate user details if needed
-      .sort({ createdAt: -1 }) // Optional: Sort by newest first
+      .populate("user", "firstName lastName profileType")
+      .sort({ createdAt: -1 })
       .exec();
 
-    res.status(200).json({ success: true, data: posts });
+    return posts;
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: "Error fetching posts",
-      error: process.env.NODE_ENV === "development" ? err.message : undefined,
-    });
+    throw new Error(`Error fetching posts: ${err.message}`);
   }
 };
 
 /**
- * Create a new recipe post
- * @param {Object} data The recipe post data
- * @returns {Object} The saved recipe post
- * @throws {Error} If there is an error saving the recipe post
+ * Create a new recipe post.
+ * @param {Object} data The recipe post data.
+ * @returns {Object} The saved recipe post.
+ * @throws {Error} If there is an error saving the recipe post.
  */
 export const createRecipePost = async (data) => {
   try {
@@ -97,47 +92,31 @@ export const createRecipePost = async (data) => {
 };
 
 /**
- * Delete a recipe post by ID
- * @param {Object} req The request object
- * @param {Object} res The response object
- * @returns {Object} An object with a success boolean, message, and the deleted post ID and title
+ * Delete a recipe post by ID.
+ * @param {String} id The ID of the recipe post to delete.
+ * @returns {Object} An object with the deleted post's ID and title.
+ * @throws {Error} If the recipe post is not found or there is an error deleting it.
  */
-export const deleteRecipePost = async (req, res) => {
+export const deleteRecipePost = async (id) => {
   try {
-    const { id } = req.params;
-
     // Validate the ID format
     if (!id.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid post ID format",
-      });
+      throw new Error("Invalid post ID format");
     }
 
     // Find and delete the post
     const deletedPost = await RecipePost.findByIdAndDelete(id);
 
     if (!deletedPost) {
-      return res.status(404).json({
-        success: false,
-        message: "Recipe post not found",
-      });
+      throw new Error("Recipe post not found");
     }
 
-    // Return the deleted post ID and title
-    return res.status(200).json({
-      success: true,
-      message: "Recipe post deleted successfully",
-      data: {
-        postId: deletedPost._id,
-        title: deletedPost.title,
-      },
-    });
+    // Return the deleted post details
+    return {
+      postId: deletedPost._id,
+      title: deletedPost.title,
+    };
   } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: "Error deleting recipe post",
-      error: process.env.NODE_ENV === "development" ? err.message : undefined,
-    });
+    throw new Error(`Error deleting recipe post: ${err.message}`);
   }
 };

@@ -3,52 +3,58 @@ import {
   getAllPosts,
   createRecipePost,
   deleteRecipePost,
-} from "../controllers/recipePostController.js";
-import RecipePost from "../models/RecipePost.js";
+} from "../controllers/recipePostController";
 
 const router = express.Router();
-
-// Create a new post
-router.post("/", async (req, res) => {
-  try {
-    const data = req.body;
-    
-    // Ensure `data` contains all the required fields
-    console.log("Request body:", data);
-
-    const savedPost = await createRecipePost(data);
-
-    res.status(201).json({
-      success: true,
-      data: savedPost,
-      message: "Post created successfully.",
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: "An error occurred while creating the post.",
-      error: err.message,
-    });
-  }
-});
 
 // Get all posts
 router.get("/", async (req, res) => {
   try {
-    const posts = await RecipePost.find();
-    res.status(200).json({
-      success: true,
-      data: posts,
-      message: "Posts retrieved successfully.",
-    });
+    const posts = getAllPosts(req.user.id);
+    res.status(200).json({ success: true, data: posts });
   } catch (err) {
     res.status(500).json({
       success: false,
-      message: "An error occurred while retrieving posts.",
-      error: err.message,
+      message: "Error fetching posts",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 });
 
-//Get
+// Create a new recipe post
+router.post("/", async (req, res) => {
+  try {
+    const savedPost = await createRecipePost(req.body);
+    res.status(201).json({
+      success: true,
+      message: "Recipe post created successfully",
+      data: savedPost,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Error creating recipe post",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
+  }
+});
+
+// Delete a recipe post
+router.delete("/:id", async (req, res) => {
+  try {
+    const deletedPost = await deleteRecipePost(req.params.id);
+    res.status(200).json({
+      success: true,
+      message: "Recipe post deleted successfully",
+      data: deletedPost,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Error deleting recipe post",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
+  }
+});
+
 export default router;

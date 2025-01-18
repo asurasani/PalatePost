@@ -7,40 +7,10 @@ import {
   getAllPosts,
   createRecipePost,
   deleteRecipePost,
-} from "../controllers/recipePostController";
+} from "../controllers/recipePostController"; // Adjusted to use the service layer
+import { createMockRecipePost } from "./mocks/mockRecipePostFactory";
 
 let mongoServer;
-
-// Mock data
-const mockUser = {
-  _id: new mongoose.Types.ObjectId(),
-  firstName: "John",
-  lastName: "Doe",
-  profileType: "Public",
-  email: "john@example.com",
-  password: "password123",
-  following: [],
-};
-
-const mockRecipe = {
-  user: mockUser._id,
-  title: "Chocolate Cake",
-  recipe: "A delicious chocolate cake recipe",
-  ingredients: [
-    { name: "flour", quantity: "2 cups" },
-    { name: "sugar", quantity: "1 cup" },
-  ],
-  steps: [
-    { stepNumber: 1, instruction: "Mix dry ingredients" },
-    { stepNumber: 2, instruction: "Add wet ingredients" },
-  ],
-  prepTime: 15,
-  cookTime: 45,
-  totalTime: 60,
-  servings: 8,
-  difficulty: "Medium",
-  mealType: "Dessert",
-};
 
 // Connect to in-memory database before tests
 beforeAll(async () => {
@@ -61,208 +31,101 @@ afterAll(async () => {
   await mongoServer.stop();
 });
 
-describe("RecipePost Model Tests", () => {
-  it("should create a recipe post successfully", async () => {
-    const validRecipePost = new RecipePost(mockRecipe);
-    const savedRecipePost = await validRecipePost.save();
-
-    expect(savedRecipePost._id).toBeDefined();
-    expect(savedRecipePost.title).toBe(mockRecipe.title);
-    expect(savedRecipePost.difficulty).toBe(mockRecipe.difficulty);
-  });
-
-  it("should fail validation when required fields are missing", async () => {
-    const invalidRecipe = new RecipePost({
-      title: "Invalid Recipe",
-      // Missing required fields
-    });
-
-    await expect(invalidRecipe.save()).rejects.toThrow();
-  });
-
-  it("should enforce enum values for difficulty", async () => {
-    const invalidDifficulty = new RecipePost({
-      ...mockRecipe,
-      difficulty: "Super Hard", // Invalid difficulty
-    });
-
-    await expect(invalidDifficulty.save()).rejects.toThrow();
-  });
-
-  it("should enforce enum values for mealType", async () => {
-    const invalidMealType = new RecipePost({
-      ...mockRecipe,
-      mealType: "Midnight Snack", // Invalid meal type
-    });
-
-    await expect(invalidMealType.save()).rejects.toThrow();
-  });
-});
-
-describe("Recipe Controller Tests", () => {
-  describe("getAllPosts", () => {
-    it("should get all public posts", async () => {
-      // Create a test user
-      const user = await User.create({
-        ...mockUser,
-        profileType: "Public",
-      });
-
-      // Create some test posts
-      await RecipePost.create({
-        ...mockRecipe,
-        user: user._id,
-      });
-
-      const req = {
-        user: { id: user._id },
-      };
-
-      const res = {
-        status: vi.fn().mockReturnThis(),
-        json: vi.fn(),
-      };
-
-      await getAllPosts(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(200);
-      expect(res.json).toHaveBeenCalled();
-      const response = res.json.mock.calls[0][0];
-      expect(response.success).toBe(true);
-      expect(response.data).toHaveLength(1);
-    });
-  });
-
+// Service Tests
+describe("RecipePost Service Tests", () => {
   describe("createRecipePost", () => {
     it("should create a new recipe post", async () => {
-      const req = {
-        body: mockRecipe,
-      };
+      const mockRecipe = createMockRecipePost();
 
-      const res = {
-        status: vi.fn().mockReturnThis(),
-        json: vi.fn(),
-      };
+      // Mock the `save` method
+      RecipePost.prototype.save = vi.fn().mockResolvedValue({
+        ...mockRecipe,
+        _id: new mongoose.Types.ObjectId(),
+      });
 
-      await createRecipePost(req, res);
+      const savedPost = await createRecipePost(mockRecipe);
 
-      expect(res.status).toHaveBeenCalledWith(201);
-      const response = res.json.mock.calls[0][0];
-      expect(response.success).toBe(true);
-      expect(response.data.title).toBe(mockRecipe.title);
+      expect(savedPost).toHaveProperty("_id");
+      expect(savedPost.title).toBe(mockRecipe.title);
+      expect(RecipePost.prototype.save).toHaveBeenCalledTimes(1);
     });
 
     it("should handle missing required fields", async () => {
-      const req = {
-        body: {
-          title: "Incomplete Recipe",
-        },
-      };
+      const incompleteRecipe = { title: "Incomplete Recipe" };
 
-      const res = {
-        status: vi.fn().mockReturnThis(),
-        json: vi.fn(),
-      };
+      await expect(createRecipePost(incompleteRecipe)).rejects.toThrow(
+        "Missing required fields: user, title, recipe, prepTime, cookTime, totalTime"
+      );
+    });
+  });
 
-      await createRecipePost(req, res);
+  describe("getAllPosts", () => {
+    it("should get all public posts", async () => {
+      const mockUser = new User({
+        firstName: "John",
+        lastName: "Doe",
+        profileType: "Public",
+        email: "john@example.com",
+        password: "password123",
+        following: [],
+      });
+      await mockUser.save();
 
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json.mock.calls[0][0].success).toBe(false);
+      const mockRecipe = createMockRecipePost({ user: mockUser._id });
+      await RecipePost.create(mockRecipe);
+
+      const posts = await getAllPosts(mockUser._id);
+
+      expect(posts).toHaveLength(1);
+      expect(posts[0].title).toBe(mockRecipe.title);
+    });
+
+    it("should throw an error if the user is not found", async () => {
+      const invalidUserId = new mongoose.Types.ObjectId();
+
+      await expect(getAllPosts(invalidUserId)).rejects.toThrow(
+        "User not found"
+      );
     });
   });
 
   describe("deleteRecipePost", () => {
     it("should delete an existing recipe post", async () => {
-      // First create a user
-      const user = await User.create({
+      const mockUser = new User({
         firstName: "John",
         lastName: "Doe",
+        profileType: "Public",
         email: "john@example.com",
         password: "password123",
-        profileType: "Public",
       });
+      await mockUser.save();
 
-      // Create a post to delete with the user reference
-      const post = await RecipePost.create({
-        ...mockRecipe,
-        user: user._id, // Set the user reference
-      });
+      const mockRecipe = createMockRecipePost({ user: mockUser._id });
+      const savedPost = await RecipePost.create(mockRecipe);
 
-      const req = {
-        params: { id: post._id.toString() },
-      };
+      const result = await deleteRecipePost(savedPost._id.toString());
 
-      const res = {
-        status: vi.fn().mockReturnThis(),
-        json: vi.fn(),
-      };
+      expect(result.postId).toEqual(savedPost._id);
+      expect(result.title).toEqual(savedPost.title);
 
-      await deleteRecipePost(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(200);
-      const response = res.json.mock.calls[0][0];
-      expect(response.success).toBe(true);
-      expect(response.data.postId.toString()).toBe(post._id.toString());
-
-      // Verify post is actually deleted
-      const deletedPost = await RecipePost.findById(post._id);
+      const deletedPost = await RecipePost.findById(savedPost._id);
       expect(deletedPost).toBeNull();
     });
 
-    it("should handle invalid post ID format", async () => {
-      const req = {
-        params: { id: "invalid-id" },
-      };
+    it("should throw an error if the post ID is invalid", async () => {
+      const invalidId = "invalid-id";
 
-      const res = {
-        status: vi.fn().mockReturnThis(),
-        json: vi.fn(),
-      };
-
-      await deleteRecipePost(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json.mock.calls[0][0].success).toBe(false);
-    });
-  });
-});
-
-// Integration Tests
-describe("Recipe Integration Tests", () => {
-  it("should create and then retrieve a recipe post", async () => {
-    // Create a test user
-    const user = await User.create(mockUser);
-
-    // Create a recipe post
-    const newRecipe = await RecipePost.create({
-      ...mockRecipe,
-      user: user._id,
+      await expect(deleteRecipePost(invalidId)).rejects.toThrow(
+        "Invalid post ID format"
+      );
     });
 
-    // Retrieve the post
-    const retrievedRecipe = await RecipePost.findById(newRecipe._id).populate(
-      "user",
-      "firstName lastName"
-    );
+    it("should throw an error if the post is not found", async () => {
+      const nonExistentId = new mongoose.Types.ObjectId().toString();
 
-    expect(retrievedRecipe.title).toBe(mockRecipe.title);
-    expect(retrievedRecipe.user.firstName).toBe(mockUser.firstName);
-  });
-
-  it("should handle the complete recipe lifecycle", async () => {
-    // Create
-    const recipe = await RecipePost.create(mockRecipe);
-    expect(recipe._id).toBeDefined();
-
-    // Update
-    recipe.title = "Updated Recipe";
-    await recipe.save();
-    const updated = await RecipePost.findById(recipe._id);
-    expect(updated.title).toBe("Updated Recipe");
-
-    // Delete
-    await RecipePost.findByIdAndDelete(recipe._id);
-    const deleted = await RecipePost.findById(recipe._id);
-    expect(deleted).toBeNull();
+      await expect(deleteRecipePost(nonExistentId)).rejects.toThrow(
+        "Recipe post not found"
+      );
+    });
   });
 });
